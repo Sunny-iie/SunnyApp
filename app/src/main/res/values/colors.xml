@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+    <!-- 背景底色：极其浅的灰米色 -->
+    <color name="background_soft">#F5F5F3</color>
+    <!-- 主色调：莫兰迪豆沙绿（清新、安全） -->
+    <color name="primary_green">#A3B18A</color>
+    <color name="primary_variant">#588157</color>
+    <!-- 次要色：莫兰迪雾霾蓝（用于分类或次要按钮） -->
+    <color name="secondary_blue">#9DB4C0</color>
+    <!-- 警告色：莫兰迪肉粉色（用于即将过期提醒，不刺眼但醒目） -->
+    <color name="warn_pink">#E29578</color>
+    <!-- 文字色：深灰而非纯黑 -->
+    <color name="text_main">#4A4E69</color>
+</resources>
