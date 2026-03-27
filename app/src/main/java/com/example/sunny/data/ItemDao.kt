@@ -22,4 +22,14 @@ interface ItemDao {
     suspend fun updateItem(item: Item)
     @Delete
     suspend fun deletePermanently(item: Item)
+
+    // 健康管理
+    @Query("SELECT * FROM health_records WHERE isDeleted = 0 ORDER BY date DESC")
+    fun getAllHealthRecords(): Flow<List<HealthRecord>>
+
+    @Insert
+    suspend fun insertHealthRecord(record: HealthRecord)
+
+    @Update
+    suspend fun updateHealthRecord(record: HealthRecord)
 }
