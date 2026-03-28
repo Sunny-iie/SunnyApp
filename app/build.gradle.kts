@@ -52,6 +52,7 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     // 添加 Material 扩展图标库
     implementation("androidx.compose.material:material-icons-extended")
+    implementation("com.google.code.gson:gson:2.10.1") // 👈 必须有这个，用于转换列表
 
     // Room 数据库
     val room_version = "2.6.1"
@@ -59,6 +60,9 @@ dependencies {
     implementation("androidx.room:room-ktx:$room_version")
     // KSP 处理注解
     ksp("androidx.room:room-compiler:$room_version")
+
+    implementation("io.coil-kt:coil-compose:2.6.0") // 用于图片显示
+    implementation("androidx.graphics:graphics-shapes:1.0.0-rc01") // 可选，用于平滑圆角
 
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")

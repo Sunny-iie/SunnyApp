@@ -6,12 +6,15 @@ import androidx.room.PrimaryKey
 @Entity(tableName = "health_records")
 data class HealthRecord(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
-    val title: String,          // 标题（如：2024年度体检、感冒就诊）
-    val type: String,           // 类型：体检、病历、用药、记录
-    val date: Long,            // 日期
-    val content: String = "",   // 具体详情（医生建议、体检结论）
-    val medication: String = "", // 用药情况
-    val cost: String = "",      // 费用记录
-    val doctorName: String = "", // 医生姓名
-    val isDeleted: Boolean = false
+    val title: String,
+    val type: String,           // "体检" 或 "病历"
+    val diseaseName: String = "常规",
+    val hospitalName: String = "",
+    val date: Long,
+    val content: String = "",
+    val medication: String = "",
+    val cost: String = "",
+    val imageUris: List<String> = emptyList(), // 确保 Converters 已配置
+    val isDeleted: Boolean = false,
+    val doctorName: String = "",
 )
