@@ -80,6 +80,7 @@ class MainActivity : ComponentActivity() {
                 // 获取已标记删除的物品（回收站）
                 val deletedItems by itemDao.getDeletedItems().collectAsState(initial = emptyList())
                 val healthRecords by itemDao.getAllHealthRecords().collectAsState(initial = emptyList())
+                val deletedHealth by itemDao.getDeletedHealthRecords().collectAsState(initial = emptyList()) // 确保 DAO 有这个方法
 
                 // --- 弹窗与编辑状态 ---
                 var showSheet by remember { mutableStateOf(false) }
@@ -150,11 +151,7 @@ class MainActivity : ComponentActivity() {
                                 }
                             )
                             1 -> HealthScreen(healthRecords, itemDao, scope) // 健康页面
-                            2 -> TrashScreen(
-                                items = deletedItems,
-                                itemDao = itemDao,
-                                scope = scope
-                            )
+                            2 -> TrashScreen(deletedItems, deletedHealth, itemDao, scope)
                         }
                     }
 

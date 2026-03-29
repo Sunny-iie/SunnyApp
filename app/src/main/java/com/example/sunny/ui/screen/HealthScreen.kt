@@ -42,6 +42,7 @@ import androidx.compose.material.icons.filled.AddAPhoto
 import androidx.compose.material.icons.filled.Assignment
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MedicalServices
 import androidx.compose.material.icons.filled.Notes
@@ -131,10 +132,41 @@ fun HealthScreen(
                         }
 
                         // 2. 该分组下的所有记录卡片
-                        items(recordList, key = { it.id }) { record ->
-                            HealthRecordCard(record) {
-                                selectedRecord = record
-                                showSheet = true
+                        items(recordList, key = { "health_${it.id}" }) { record ->
+                            val dismissState = rememberSwipeToDismissBoxState(
+                                confirmValueChange = { value ->
+                                    if (value == SwipeToDismissBoxValue.EndToStart) {
+                                        scope.launch {
+                                            // 标记为已删除（进入回收站）
+                                            itemDao.updateHealthRecord(record.copy(isDeleted = true))
+                                        }
+                                        true
+                                    } else false
+                                }
+                            )
+
+                            SwipeToDismissBox(
+                                state = dismissState,
+                                enableDismissFromStartToEnd = false,
+                                backgroundContent = {
+                                    val color = if (dismissState.dismissDirection == SwipeToDismissBoxValue.EndToStart)
+                                        MorandiRed.copy(alpha = 0.8f) else Color.Transparent
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .padding(horizontal = 16.dp, vertical = 6.dp)
+                                            .clip(RoundedCornerShape(16.dp))
+                                            .background(color),
+                                        contentAlignment = Alignment.CenterEnd
+                                    ) {
+                                        Icon(Icons.Default.Delete, null, tint = Color.White, modifier = Modifier.padding(end = 20.dp))
+                                    }
+                                }
+                            ) {
+                                HealthRecordCard(record) {
+                                    selectedRecord = record
+                                    showSheet = true
+                                }
                             }
                         }
                     }
