@@ -17,5 +17,6 @@ data class HealthRecord(
     val imageUris: List<String> = emptyList(), // 确保 Converters 已配置
     val metrics: List<HealthMetric> = emptyList(), // 这里的 HealthMetric 会自动引用新文件里的
     val isDeleted: Boolean = false,
-    val doctorName: String = ""
+    val doctorName: String = "",
+    val examReports: List<HealthExamReport> = emptyList(),
 )

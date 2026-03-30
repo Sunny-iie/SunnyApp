@@ -80,11 +80,21 @@ fun TrashScreen(
         LazyColumn(Modifier.fillMaxSize()) {
             // --- 顶部大标题 ---
             item {
+//                Text(
+//                    "回收站",
+//                    style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Light),
+//                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 20.dp),
+//                    color = MorandiDark
+//                )
                 Text(
-                    "回收站",
-                    style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Light),
-                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 20.dp),
-                    color = MorandiDark
+                    text = "回收站",
+                    style = MaterialTheme.typography.headlineMedium.copy(
+                        fontWeight = FontWeight.SemiBold, // 稍微加粗一点，显得更大方
+                        letterSpacing = 1.sp,
+                        color = MorandiRed
+                    ),
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 24.dp),
+                    color = MorandiRed
                 )
             }
 

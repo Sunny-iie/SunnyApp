@@ -46,14 +46,17 @@ import androidx.compose.material.icons.filled.AddChart
 import androidx.compose.material.icons.filled.Assignment
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.MedicalServices
 import androidx.compose.material.icons.filled.Notes
 import androidx.compose.material.icons.filled.PictureAsPdf
+import androidx.compose.material.icons.filled.PostAdd
 import androidx.compose.material.icons.filled.RemoveCircleOutline
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
@@ -65,10 +68,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.example.sunny.data.HealthExamReport
 import com.example.sunny.data.HealthMetric
 import com.example.sunny.data.HealthTemplates
+import com.example.sunny.data.MetricType
 import com.example.sunny.ui.theme.MorandiRed
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -116,10 +122,11 @@ fun HealthScreen(
                 text = "健康档案",
                 style = MaterialTheme.typography.headlineMedium.copy(
                     fontWeight = FontWeight.SemiBold, // 稍微加粗一点，显得更大方
-                    letterSpacing = 1.sp
+                    letterSpacing = 1.sp,
+                    color = MorandiBlue
                 ),
                 modifier = Modifier.padding(horizontal = 24.dp, vertical = 24.dp),
-                color = MorandiDark
+                color = MorandiBlue
             )
 
             if (records.isEmpty()) {
@@ -301,6 +308,10 @@ fun HealthFormSheet(
     var imageUris by remember { mutableStateOf(initial?.imageUris ?: emptyList()) }
     var metrics by remember { mutableStateOf(initial?.metrics ?: emptyList<HealthMetric>()) }
     var isScanning by remember { mutableStateOf(false) }
+    var pasteText by remember { mutableStateOf("") } // 粘贴板文字
+    var examReports by remember {
+        mutableStateOf(initial?.examReports ?: emptyList<HealthExamReport>())
+    }
 
     // 1. 修改选择器，支持所有图片和 PDF
     val launcher = rememberLauncherForActivityResult(
@@ -321,28 +332,41 @@ fun HealthFormSheet(
         // 将新选择的 Uri 合并到列表
         imageUris = imageUris + uris.map { it.toString() }
     }
+    // 使用 Box 容器来叠加“滚动层”和“固定层”
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .fillMaxHeight(0.9f) // 保持弹窗高度
+            .background(White)
+    ) {
 
     Column(
         modifier = Modifier
-            .fillMaxWidth()
-            .navigationBarsPadding() // 避开底部导航条
-            .imePadding()            // 关键：避开软键盘，防止键盘挡住输入框
+            .fillMaxSize()
             .padding(horizontal = 24.dp)
-            .padding(bottom = 32.dp)
-            .verticalScroll(rememberScrollState()) // 确保内容多时可滑动
+            // 关键：给底部留出足够的 padding，防止内容被固定的按钮遮挡
+            .padding(bottom = 100.dp)
+            .verticalScroll(rememberScrollState())
+            .imePadding() // 避让键盘
     ) {
         Text(
-            text = if (initial == null) "✨ 新增健康记录" else "✏️ 修改健康记录",
+            text = if (initial == null) "✨ 录入新记录" else "✏️ 编辑信息",
             style = MaterialTheme.typography.headlineSmall,
             color = MorandiDark,
-            modifier = Modifier.padding(vertical = 16.dp)
+            modifier = Modifier.padding(vertical = 24.dp)
         )
 
         // 1. 标题输入
         OutlinedTextField(
             value = title,
             onValueChange = { title = it },
-            label = { Text("记录名称 (如：XX医院年度体检)", style = MaterialTheme.typography.bodyMedium, color = Color.LightGray,) },
+            label = {
+                Text(
+                    "记录名称 (如：XX医院年度体检)",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.LightGray,
+                )
+            },
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(12.dp),
             singleLine = true
@@ -381,7 +405,7 @@ fun HealthFormSheet(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Text("发生日期", style = MaterialTheme.typography.bodyMedium, color = MorandiDark)
+                Text("发生日期", style = MaterialTheme.typography.labelMedium, color = MorandiBlue)
                 Text(sdf.format(Date(date)), color = MorandiBlue, fontWeight = FontWeight.Medium)
             }
         }
@@ -393,14 +417,26 @@ fun HealthFormSheet(
             OutlinedTextField(
                 value = doctor,
                 onValueChange = { doctor = it },
-                label = { Text("主治医生", style = MaterialTheme.typography.bodyMedium, color = Color.LightGray,) },
+                label = {
+                    Text(
+                        "主治医生",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.LightGray,
+                    )
+                },
                 modifier = Modifier.weight(1f),
                 shape = RoundedCornerShape(12.dp)
             )
             OutlinedTextField(
                 value = cost,
                 onValueChange = { cost = it },
-                label = { Text("花费(元)", style = MaterialTheme.typography.bodyMedium, color = Color.LightGray,) },
+                label = {
+                    Text(
+                        "花费(元)",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.LightGray,
+                    )
+                },
                 modifier = Modifier.weight(0.8f),
                 shape = RoundedCornerShape(12.dp),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
@@ -414,23 +450,197 @@ fun HealthFormSheet(
             OutlinedTextField(
                 value = diseaseName,
                 onValueChange = { diseaseName = it },
-                label = { Text("分组 (如:消化系统)") },
+                label = {
+                    Text(
+                        "分组 (如:消化系统)",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MorandiBlue
+                    )
+                },
                 modifier = Modifier.weight(1f)
             )
             OutlinedTextField(
                 value = hospitalName,
                 onValueChange = { hospitalName = it },
-                label = { Text("就诊医院", style = MaterialTheme.typography.bodyMedium, color = Color.LightGray,) },
+                label = {
+                    Text(
+                        "就诊医院",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.LightGray,
+                    )
+                },
                 modifier = Modifier.weight(1f)
             )
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(8.dp))
+
+        if (type == "体检") {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 12.dp)
+                    .background(MorandiBlue.copy(alpha = 0.05f), RoundedCornerShape(16.dp))
+                    .padding(16.dp)
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Default.AutoAwesome,
+                        null,
+                        tint = MorandiBlue,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        "AI 智能填表",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MorandiBlue
+                    )
+                }
+
+                Spacer(Modifier.height(8.dp))
+
+                // 窄窄的输入框
+                OutlinedTextField(
+                    value = pasteText,
+                    onValueChange = { pasteText = it },
+                    placeholder = {
+                        Text(
+                            "在此粘贴 AI 总结的指标数据...",
+                            fontSize = 12.sp,
+                            color = Color.LightGray
+                        )
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 100.dp), // 限制高度，不占地方
+                    textStyle = MaterialTheme.typography.bodySmall,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MorandiBlue,
+                        unfocusedBorderColor = MorandiBlue.copy(alpha = 0.2f),
+                        // 将 containerColor 修改为下面这两个参数
+                        focusedContainerColor = Color.White,
+                        unfocusedContainerColor = Color.White
+                    ),
+                    // 增加一键解析按钮
+                    trailingIcon = {
+                        if (pasteText.isNotEmpty()) {
+                            IconButton(onClick = {
+                                if (pasteText.isNotBlank()) {
+                                    val base =
+                                        if (metrics.isEmpty()) HealthTemplates.fullCheckupMetrics else metrics
+
+                                    // 调用新的 Pair 解析方法
+                                    val (newMetrics, newReports) = com.example.sunny.util.TextParser.parseAll(
+                                        pasteText,
+                                        base
+                                    )
+
+                                    metrics = newMetrics
+                                    examReports = newReports
+
+                                    pasteText = ""
+                                    Toast.makeText(context, "已智能分类填入", Toast.LENGTH_SHORT)
+                                        .show()
+                                }
+                            }) {
+                                Icon(Icons.Default.CheckCircle, null, tint = MorandiGreen)
+                            }
+                        }
+                    }
+                )
+
+                Text(
+                    "提示：粘贴“指标 结果”格式文字，点击对勾自动填表",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color.Gray.copy(alpha = 0.6f),
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+            }
+            // 2. 指标表格区 (Metrics)
+            Text(
+                "1. 基础指标明细",
+                style = MaterialTheme.typography.titleSmall,
+                color = MorandiDark,
+                modifier = Modifier.padding(top = 16.dp)
+            )
+            val editGroups = metrics.groupBy { it.category }
+            editGroups.forEach { (catName, catItems) ->
+                Text(
+                    catName,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MorandiBlue,
+                    modifier = Modifier.padding(top = 8.dp)
+                )
+                catItems.forEach { metric ->
+                    MetricEditRow(
+                        metric = metric,
+                        onUpdate = { updated ->
+                            val newList = metrics.toMutableList()
+                            val index = metrics.indexOf(metric)
+                            if (index != -1) {
+                                newList[index] = updated; metrics = newList
+                            }
+                        },
+                        onDelete = {
+                            val newList = metrics.toMutableList()
+                            newList.remove(metric)
+                            metrics = newList
+                        }
+                    )
+                }
+            }
+            // 【新增】手动添加指标按钮
+            TextButton(onClick = {
+                metrics = metrics + HealthMetric("自定义", "新项目", "", "", type = MetricType.TEXT)
+            }) {
+                Icon(Icons.Default.Add, null, modifier = Modifier.size(16.dp))
+                Text("增加指标行", style = MaterialTheme.typography.labelSmall)
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // 3. 大型报告区 (Exam Reports)
+            Text(
+                "2. 影像功能报告",
+                style = MaterialTheme.typography.titleSmall,
+                color = MorandiDark
+            )
+            examReports.forEachIndexed { index, report ->
+                ExamReportEditCard(
+                    report = report,
+                    onUpdate = { updated ->
+                        val newList = examReports.toMutableList()
+                        newList[index] = updated
+                        examReports = newList
+                    },
+                    onDelete = {
+                        val newList = examReports.toMutableList()
+                        newList.removeAt(index)
+                        examReports = newList
+                    }
+                )
+            }
+            // 【新增】手动添加报告按钮
+            OutlinedButton(
+                onClick = { examReports = examReports + HealthExamReport("新检查项目", "", "") },
+                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                shape = RoundedCornerShape(12.dp),
+                border = BorderStroke(1.dp, MorandiBlue.copy(alpha = 0.3f))
+            ) {
+                Icon(Icons.Default.PostAdd, null)
+                Spacer(Modifier.width(8.dp))
+                Text("手动添加一项检查报告")
+            }
+        }
+
 
         // 3. 图片展示与上传区
         Text("报告及照片附件", style = MaterialTheme.typography.labelSmall, color = MorandiBlue)
         Row(
-            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp).horizontalScroll(rememberScrollState()),
+            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)
+                .horizontalScroll(rememberScrollState()),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             // 修改原本的 IconButton 或者是上传按钮的 onClick
@@ -462,7 +672,12 @@ fun HealthFormSheet(
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.Center
                         ) {
-                            Icon(Icons.Default.PictureAsPdf, null, tint = MorandiRed, modifier = Modifier.size(28.dp))
+                            Icon(
+                                Icons.Default.PictureAsPdf,
+                                null,
+                                tint = MorandiRed,
+                                modifier = Modifier.size(28.dp)
+                            )
                             Text("PDF", fontSize = 10.sp, color = MorandiRed)
                         }
                     } else {
@@ -478,9 +693,15 @@ fun HealthFormSheet(
                     // 可选：增加一个删除小叉号，方便取消选错的图
                     IconButton(
                         onClick = { imageUris = imageUris.filter { it != uri } },
-                        modifier = Modifier.align(Alignment.TopEnd).size(24.dp).background(Color.Black.copy(0.3f), CircleShape)
+                        modifier = Modifier.align(Alignment.TopEnd).size(24.dp)
+                            .background(Color.Black.copy(0.3f), CircleShape)
                     ) {
-                        Icon(Icons.Default.Close, null, tint = Color.White, modifier = Modifier.size(14.dp))
+                        Icon(
+                            Icons.Default.Close,
+                            null,
+                            tint = Color.White,
+                            modifier = Modifier.size(14.dp)
+                        )
                     }
                 }
             }
@@ -488,104 +709,18 @@ fun HealthFormSheet(
         }
         Spacer(modifier = Modifier.height(24.dp))
 
-        if (type == "体检") {
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Text("体检指标", style = MaterialTheme.typography.labelSmall, color = MorandiBlue)
-
-            // 如果当前列表为空，显示“添加”大按钮
-            if (metrics.isEmpty()) {
-                OutlinedButton(
-                    onClick = { metrics = HealthTemplates.defaultMetrics }, // 👈 一键导入刚才定义的模板
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Icon(Icons.Default.AddChart, null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(4.dp))
-                    Text("添加常用体检指标")
-                }
-            }
-            if (imageUris.isNotEmpty()) {
-//                Spacer(modifier = Modifier.height(2.dp))
-                Button(
-                    onClick = {
-                        isScanning = true
-                        // 尝试识别第一张图
-                        val uri = Uri.parse(imageUris.first())
-                        com.example.sunny.util.MetricScanner.scanImage(context, uri) { results ->
-                            if (results.isEmpty()) {
-                                Toast.makeText(context, "未能识别到有效指标，请确保字迹清晰", Toast.LENGTH_LONG).show()
-                            } else {
-                                // 1. 确定底表（如果没有点击过模板，就用默认模板当底）
-                                val baseList = if (metrics.isEmpty()) HealthTemplates.defaultMetrics else metrics
-
-                                // 2. 填充数据
-                                val updatedList = baseList.map { item ->
-                                    if (results.containsKey(item.label)) {
-                                        // 如果识别到了，用识别的值
-                                        item.copy(value = results[item.label] ?: "")
-                                    } else {
-                                        item
-                                    }
-                                }
-
-                                // 3. 强制更新 Compose 状态
-                                metrics = updatedList
-
-                                isScanning = false
-                                Toast.makeText(context, "成功识别 ${results.size} 个项目", Toast.LENGTH_SHORT).show()
-                            }
-                            isScanning = false // 确保无论如何都停止加载圈
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(containerColor = MorandiBlue),
-                    enabled = !isScanning,
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    if (isScanning) {
-                        CircularProgressIndicator(modifier = Modifier.size(20.dp), color = White, strokeWidth = 2.dp)
-                    } else {
-                        Icon(Icons.Default.AutoAwesome, null)
-                        Spacer(Modifier.width(4.dp))
-                        Text("识别首张附件并填表")
-                    }
-                }
-            }
-
-            // 渲染指标录入区域
-            metrics.forEachIndexed { index, metric ->
-                MetricEditRow(
-                    metric = metric,
-                    onUpdate = { updated ->
-                        // 更新列表中对应的项
-                        val newList = metrics.toMutableList()
-                        newList[index] = updated
-                        metrics = newList
-                    },
-                    onDelete = {
-                        val newList = metrics.toMutableList()
-                        newList.removeAt(index)
-                        metrics = newList
-                    }
-                )
-            }
-
-            // 允许在模板之外手动新增自定义行
-            if (metrics.isNotEmpty()) {
-                TextButton(onClick = { metrics = metrics + HealthMetric("", "", "") }) {
-                    Icon(Icons.Default.Add, null, modifier = Modifier.size(16.dp))
-                    Text("新增自定义指标", fontSize = 12.sp)
-                }
-            }
-        }
-
 
         // 5. 详情记录
         OutlinedTextField(
             value = content,
             onValueChange = { content = it },
-            label = { Text("详情/体检结论/医生嘱托", style = MaterialTheme.typography.bodyMedium, color = Color.LightGray,) },
+            label = {
+                Text(
+                    "详情/体检结论/医生嘱托",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.LightGray,
+                )
+            },
             modifier = Modifier.fillMaxWidth(),
             minLines = 3,
             shape = RoundedCornerShape(12.dp)
@@ -593,35 +728,58 @@ fun HealthFormSheet(
 
         Spacer(modifier = Modifier.height(32.dp))
 
-        // 6. 保存按钮
-        Button(
-            onClick = {
-                if (title.isNotBlank()) {
-                    onSave(HealthRecord(
-                        id = initial?.id ?: 0,
-                        title = title,
-                        type = type,
-                        date = date,
-                        content = content,
-                        medication = medication,
-                        cost = cost,
-                        doctorName = doctor,
-                        isDeleted = initial?.isDeleted ?: false,
-                        diseaseName = diseaseName,
-                        hospitalName = hospitalName,
-                        imageUris = imageUris,
-                        metrics = metrics
-                    ))
-                }
-            },
-            modifier = Modifier.fillMaxWidth().height(56.dp),
-            shape = RoundedCornerShape(16.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = MorandiGreen)
-        ) {
-            Text("确认保存", fontWeight = FontWeight.Bold)
-        }
+
 
         Spacer(modifier = Modifier.height(24.dp))
+    }
+        // --- 第二层：固定的吸底按钮区 ---
+        Surface(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth(),
+            color = White,
+            tonalElevation = 8.dp, // 增加微弱的阴影，营造悬浮感
+            shadowElevation = 10.dp
+        ) {
+            Column(
+                modifier = Modifier
+                    .navigationBarsPadding() // 避开手机底部横条
+                    .padding(horizontal = 24.dp, vertical = 16.dp)
+            ) {
+                Button(
+                    onClick = {
+                        if (title.isNotBlank()) {
+                            onSave(HealthRecord(
+                                id = initial?.id ?: 0,
+                                title = title,
+                                type = type,
+                                diseaseName = diseaseName,
+                                hospitalName = hospitalName,
+                                doctorName = doctor,
+                                date = date,
+                                content = content,
+                                medication = medication,
+                                cost = cost,
+                                imageUris = imageUris,
+                                metrics = metrics,
+                                examReports = examReports,
+                                isDeleted = initial?.isDeleted ?: false
+                            ))
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = MorandiGreen),
+                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
+                ) {
+                    Icon(Icons.Default.Check, null, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("确认保存健康记录", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
     }
 }
 
@@ -656,19 +814,46 @@ fun HealthDetailView(record: HealthRecord, onEditClick: () -> Unit) {
         }
 
         // --- 核心信息卡片 (蓝色背景区) ---
+        // --- 核心信息卡片 (2x2 紧凑布局) ---
         Surface(
             color = MorandiBlue.copy(alpha = 0.05f),
-            shape = RoundedCornerShape(16.dp),
+            shape = RoundedCornerShape(12.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                InfoRow("就诊时间", sdf.format(Date(record.date)))
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp) // 行间距
+            ) {
+                // 第一行：时间 和 医院
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    CompactInfoItem(
+                        label = "就诊时间",
+                        value = sdf.format(Date(record.date)),
+                        modifier = Modifier.weight(1f)
+                    )
+                    CompactInfoItem(
+                        label = "就诊医院",
+                        value = record.hospitalName.ifEmpty { "未记录" },
+                        modifier = Modifier.weight(1.2f) // 医院名字可能较长，给多一点权重
+                    )
+                }
 
-                // 重点修复：显示医院
-                InfoRow("就诊医院", record.hospitalName.ifEmpty { "未记录" })
+                // 分割细线 (可选，增加精致感)
+                HorizontalDivider(thickness = 0.5.dp, color = MorandiBlue.copy(alpha = 0.1f))
 
-                InfoRow("主治医生", record.doctorName.ifEmpty { "未记录" })
-                InfoRow("产生费用", if(record.cost.isEmpty()) "¥ 0" else "¥ ${record.cost}")
+                // 第二行：医生 和 费用
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    CompactInfoItem(
+                        label = "主治医生",
+                        value = record.doctorName.ifEmpty { "未记录" },
+                        modifier = Modifier.weight(1f)
+                    )
+                    CompactInfoItem(
+                        label = "产生费用",
+                        value = if(record.cost.isEmpty()) "¥ 0" else "¥ ${record.cost}",
+                        modifier = Modifier.weight(1.2f)
+                    )
+                }
             }
         }
 
@@ -681,6 +866,17 @@ fun HealthDetailView(record: HealthRecord, onEditClick: () -> Unit) {
             )
             // 调用我们下面定义的表格组件
             HealthReportTable(record.metrics)
+        }
+
+        // 2. 展示大型检查报告（方框形式）
+        if (record.examReports.isNotEmpty()) {
+            Spacer(Modifier.height(16.dp))
+            Text("影像功能报告", style = MaterialTheme.typography.titleSmall, color = MorandiBlue, modifier = Modifier.padding(vertical = 8.dp))
+
+            record.examReports.forEach { report ->
+                ExamReportCard(report)
+                Spacer(Modifier.height(12.dp))
+            }
         }
 
         // --- 详细描述 ---
@@ -857,82 +1053,49 @@ fun FileDetailItem(uriString: String) {
 
 @Composable
 fun HealthReportTable(metrics: List<HealthMetric>) {
-    val displayList = metrics.filter { it.value.isNotEmpty() }
-    if (displayList.isEmpty()) return
+    // 1. 过滤掉空值，并按 category 分组
+    val groupedMetrics = metrics.filter { it.value.isNotBlank() }.groupBy { it.category }
 
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 12.dp),
-        color = White,
-        shape = RoundedCornerShape(16.dp),
-        border = BorderStroke(0.5.dp, MorandiBlue.copy(alpha = 0.1f)),
-        shadowElevation = 0.5.dp
+    if (groupedMetrics.isEmpty()) return
+
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(12.dp) // 每个分类卡片之间的间距
     ) {
-        Column(modifier = Modifier.padding(vertical = 8.dp)) {
-            displayList.forEachIndexed { index, metric ->
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.Top // 顶部对齐，方便多行展示参考值
-                ) {
-                    // 1. 左侧：指标名称（占据一半空间）
-                    Text(
-                        text = metric.label,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MorandiDark.copy(alpha = 0.7f),
-                        modifier = Modifier.weight(1f)
-                    )
-
-                    // 2. 右侧：数值信息块（占据另一半空间，且内容靠右）
-                    Column(
-                        modifier = Modifier.weight(1f),
-                        horizontalAlignment = Alignment.End // 关键：让数字和下方信息全部右对齐
+        groupedMetrics.forEach { (categoryName, items) ->
+            // --- 分类区块卡片 ---
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = White,
+                shape = RoundedCornerShape(12.dp),
+                border = BorderStroke(0.5.dp, MorandiBlue.copy(alpha = 0.1f))
+            ) {
+                Column(modifier = Modifier.padding(bottom = 8.dp)) {
+                    // 分类标题栏（带淡淡的底色背景）
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        color = MorandiBlue.copy(alpha = 0.05f)
                     ) {
-                        // 数值
                         Text(
-                            text = metric.value,
-                            style = MaterialTheme.typography.titleMedium.copy(
-                                fontWeight = FontWeight.SemiBold,
-                                color = if (metric.isAbnormal()) MorandiRed else MorandiDark,
-                                textAlign = TextAlign.End // 文字在内部也右对齐
-                            )
+                            text = categoryName,
+                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                            color = MorandiBlue,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
                         )
+                    }
 
-                        // 单位 + 参考值（放在数字下方，不再干扰数字对齐）
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            if (metric.unit.isNotEmpty()) {
-                                Text(
-                                    text = "(${metric.unit})",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = Color.Gray.copy(alpha = 0.6f)
-                                )
-                                if (metric.getRefText().isNotEmpty()) {
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Box(modifier = Modifier.size(2.dp).background(Color.LightGray, CircleShape))
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                }
-                            }
-
-                            if (metric.getRefText().isNotEmpty()) {
-                                Text(
-                                    text = metric.getRefText().replace("参考值: ", ""), // 简化文案，更精致
-                                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-                                    color = Color.LightGray
-                                )
-                            }
+                    // 遍历该分类下的指标
+                    items.forEachIndexed { index, metric ->
+                        CompactMetricRow(metric)
+                        // 分行线：最后一项不显示
+                        if (index < items.size - 1) {
+                            HorizontalDivider(
+                                modifier = Modifier.padding(horizontal = 16.dp),
+                                thickness = 0.5.dp,
+                                color = MorandiBlue.copy(alpha = 0.05f)
+                            )
                         }
                     }
-                }
-
-                // 极细分割线
-                if (index < displayList.size - 1) {
-                    HorizontalDivider(
-                        modifier = Modifier.padding(horizontal = 16.dp),
-                        thickness = 0.5.dp,
-                        color = MorandiBlue.copy(alpha = 0.05f)
-                    )
                 }
             }
         }
@@ -940,41 +1103,54 @@ fun HealthReportTable(metrics: List<HealthMetric>) {
 }
 
 @Composable
-fun MetricRow(metric: HealthMetric) {
+fun CompactMetricRow(metric: HealthMetric) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(16.dp),
+            .padding(horizontal = 16.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment = Alignment.CenterVertically // 居中对齐让单行更整齐
     ) {
         // 左侧：指标名称
         Text(
             text = metric.label,
-            style = MaterialTheme.typography.bodyLarge,
-            color = MorandiDark.copy(alpha = 0.8f)
+            style = MaterialTheme.typography.bodyMedium,
+            color = MorandiDark.copy(alpha = 0.8f),
+            modifier = Modifier.weight(1f)
         )
 
-        // 右侧：数值和单位
+        // 右侧：数值 + 详情信息（垂直排布）
         Column(horizontalAlignment = Alignment.End) {
+            // 第一层：数值
             Text(
                 text = metric.value,
-                style = MaterialTheme.typography.titleMedium,
-                // 如果异常显示红色，否则显示深色
-                color = if (metric.isAbnormal()) MorandiRed else MorandiDark,
-                fontWeight = FontWeight.Bold
+                style = MaterialTheme.typography.bodyLarge.copy(
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (metric.isAbnormal) MorandiRed else MorandiDark
+                )
             )
-            if (metric.unit.isNotEmpty()) {
+
+            // 第二层：单位和参考值合并（极小字号）
+            val detailText = buildString {
+                if (metric.unit.isNotEmpty()) append(metric.unit)
+                if (metric.refText.isNotEmpty()) {
+                    if (isNotEmpty()) append(" | ")
+                    append(metric.refText.replace("参考值: ", ""))
+                }
+            }
+
+            if (detailText.isNotBlank()) {
                 Text(
-                    text = metric.unit,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = Color.Gray
+                    text = detailText,
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
+                    color = Color.LightGray,
+                    maxLines = 1,
+                    softWrap = false
                 )
             }
         }
     }
 }
-
 // 抽取出来的指标输入行组件，防止代码混乱
 @Composable
 fun MetricInputRow(
@@ -1019,9 +1195,9 @@ fun MetricInputRow(
         ) {
             if (metric.value.isNotEmpty()) { // 只有填了值才显示图标
                 Icon(
-                    imageVector = if (metric.isAbnormal()) Icons.Default.Error else Icons.Default.CheckCircle,
+                    imageVector = if (metric.isAbnormal) Icons.Default.Error else Icons.Default.CheckCircle,
                     contentDescription = null,
-                    tint = if (metric.isAbnormal()) MorandiRed else MorandiGreen.copy(alpha = 0.6f),
+                    tint = if (metric.isAbnormal) MorandiRed else MorandiGreen.copy(alpha = 0.6f),
                     modifier = Modifier.size(18.dp)
                 )
             }
@@ -1078,15 +1254,15 @@ fun MetricEditRow(
                 modifier = Modifier.fillMaxWidth(),
                 textStyle = MaterialTheme.typography.bodyMedium.copy(
                     // 【高级感】：输入如果异常，文字颜色即刻变红
-                    color = if (metric.isAbnormal()) MorandiRed else MorandiDark,
+                    color = if (metric.isAbnormal) MorandiRed else MorandiDark,
                     fontWeight = FontWeight.Bold
                 ),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 shape = RoundedCornerShape(8.dp),
                 singleLine = true,
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = if (metric.isAbnormal()) MorandiRed else MorandiGreen,
-                    unfocusedBorderColor = if (metric.isAbnormal()) MorandiRed.copy(alpha = 0.5f) else MorandiBlue.copy(alpha = 0.2f)
+                    focusedBorderColor = if (metric.isAbnormal) MorandiRed else MorandiGreen,
+                    unfocusedBorderColor = if (metric.isAbnormal) MorandiRed.copy(alpha = 0.5f) else MorandiBlue.copy(alpha = 0.2f)
                 )
             )
         }
@@ -1103,5 +1279,186 @@ fun MetricEditRow(
                 modifier = Modifier.size(18.dp)
             )
         }
+    }
+}
+
+@Composable
+fun HealthExamReportSection(reports: List<HealthExamReport>) {
+    if (reports.isEmpty()) return
+
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Text(
+            "影像/功能检查报告",
+            style = MaterialTheme.typography.titleSmall,
+            color = MorandiBlue,
+            modifier = Modifier.padding(top = 8.dp)
+        )
+
+        reports.forEach { report ->
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = White,
+                shape = RoundedCornerShape(12.dp),
+                border = BorderStroke(1.dp, MorandiBlue.copy(alpha = 0.15f))
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    // 1. 报告标题 (如：十二通道常规心电图检查)
+                    Text(
+                        text = report.examName,
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                        color = MorandiBlue
+                    )
+
+                    // 2. 检查所见 (灰色小字标签 + 描述)
+                    if (report.findings.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text("【检查所见】", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                        Text(
+                            text = report.findings,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MorandiDark.copy(alpha = 0.8f),
+                            lineHeight = 20.sp
+                        )
+                    }
+
+                    // 3. 检查结论 (重点：MorandiBlue 强调)
+                    if (report.conclusion.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Surface(
+                            color = MorandiBlue.copy(alpha = 0.05f),
+                            shape = RoundedCornerShape(4.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(Modifier.padding(8.dp)) {
+                                Text("【检查结论】", style = MaterialTheme.typography.labelSmall, color = MorandiBlue)
+                                Text(
+                                    text = report.conclusion,
+                                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+                                    color = MorandiDark
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ExamReportCard(report: HealthExamReport) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = White,
+        shape = RoundedCornerShape(12.dp),
+        border = BorderStroke(0.5.dp, MorandiBlue.copy(alpha = 0.2f))
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            // 报告名称
+            Text(report.examName, style = MaterialTheme.typography.titleMedium, color = MorandiBlue, fontWeight = FontWeight.Bold)
+
+            if (report.findings.isNotBlank()) {
+                Spacer(Modifier.height(8.dp))
+                Text("【检查所见】", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                Text(report.findings, style = MaterialTheme.typography.bodySmall, color = MorandiDark, lineHeight = 18.sp)
+            }
+
+            if (report.conclusion.isNotBlank()) {
+                Spacer(Modifier.height(8.dp))
+                Surface(
+                    color = MorandiBlue.copy(alpha = 0.05f),
+                    shape = RoundedCornerShape(4.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(Modifier.padding(8.dp)) {
+                        Text("【检查结论】", style = MaterialTheme.typography.labelSmall, color = MorandiBlue)
+                        Text(report.conclusion, style = MaterialTheme.typography.bodySmall, color = MorandiDark, fontWeight = FontWeight.Medium)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ExamReportEditCard(
+    report: HealthExamReport,
+    onUpdate: (HealthExamReport) -> Unit,
+    onDelete: () -> Unit
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+        color = MorandiBlue.copy(alpha = 0.02f),
+        shape = RoundedCornerShape(12.dp),
+        border = BorderStroke(0.5.dp, MorandiBlue.copy(alpha = 0.2f))
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                // 检查名称编辑
+                BasicTextField(
+                    value = report.examName,
+                    onValueChange = { onUpdate(report.copy(examName = it)) },
+                    modifier = Modifier.weight(1f),
+                    textStyle = MaterialTheme.typography.titleSmall.copy(color = MorandiBlue, fontWeight = FontWeight.Bold),
+                    decorationBox = { inner ->
+                        if (report.examName.isEmpty()) Text("检查项目名称", color = Color.LightGray, style = MaterialTheme.typography.titleSmall)
+                        inner()
+                    }
+                )
+                IconButton(onClick = onDelete, modifier = Modifier.size(24.dp)) {
+                    Icon(Icons.Default.DeleteOutline, null, tint = MorandiRed.copy(alpha = 0.5f))
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // 检查所见编辑
+            Text("检查所见", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+            OutlinedTextField(
+                value = report.findings,
+                onValueChange = { onUpdate(report.copy(findings = it)) },
+                modifier = Modifier.fillMaxWidth(),
+                textStyle = MaterialTheme.typography.bodySmall,
+                shape = RoundedCornerShape(8.dp),
+                colors = OutlinedTextFieldDefaults.colors(unfocusedBorderColor = Color.Transparent, focusedContainerColor = Color.White)
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // 检查结论编辑
+            Text("检查结论", style = MaterialTheme.typography.labelSmall, color = MorandiBlue)
+            OutlinedTextField(
+                value = report.conclusion,
+                onValueChange = { onUpdate(report.copy(conclusion = it)) },
+                modifier = Modifier.fillMaxWidth(),
+                textStyle = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
+                shape = RoundedCornerShape(8.dp),
+                colors = OutlinedTextFieldDefaults.colors(unfocusedBorderColor = MorandiBlue.copy(alpha = 0.1f), focusedContainerColor = Color.White)
+            )
+        }
+    }
+}
+
+@Composable
+fun CompactInfoItem(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier
+) {
+    Column(modifier = modifier) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MorandiBlue.copy(alpha = 0.6f)
+        )
+        Spacer(modifier = Modifier.height(2.dp))
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MorandiDark,
+            fontWeight = FontWeight.Medium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis // 医院名太长自动省略
+        )
     }
 }

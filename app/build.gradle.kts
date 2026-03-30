@@ -21,11 +21,14 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true // 开启代码混淆，减小体积并保护代码
+            isShrinkResources = true // 移除无用的资源文件
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            // 自动配置签名（可选，这样每次点运行 release 就不弹窗了）
+            // signingConfig = signingConfigs.getByName("release")
         }
     }
     compileOptions {

@@ -104,7 +104,7 @@ fun MainListScreen(
                         fontWeight = FontWeight.SemiBold, // 稍微加粗一点，显得更大方
                         letterSpacing = 1.sp
                     ),
-                    color = MorandiDark
+                    color = MorandiGreen
                 )
                 // 增加一个微小的筛选状态提示
                 Text(
