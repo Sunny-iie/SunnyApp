@@ -27,6 +27,7 @@ import java.util.Date
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.Alignment
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.content.MediaType.Companion.Text
 import androidx.compose.foundation.horizontalScroll
@@ -34,19 +35,24 @@ import com.example.sunny.data.HealthRecord
 import com.example.sunny.data.ItemDao
 import kotlinx.coroutines.CoroutineScope
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.automirrored.filled.Assignment
 import androidx.compose.material.icons.automirrored.filled.Notes
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AddAPhoto
+import androidx.compose.material.icons.filled.AddChart
 import androidx.compose.material.icons.filled.Assignment
 import androidx.compose.material.icons.filled.AttachFile
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.MedicalServices
 import androidx.compose.material.icons.filled.Notes
 import androidx.compose.material.icons.filled.PictureAsPdf
+import androidx.compose.material.icons.filled.RemoveCircleOutline
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
@@ -54,10 +60,16 @@ import com.example.sunny.showDatePicker
 import com.example.sunny.ui.theme.MorandiBeige
 import kotlinx.coroutines.launch
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.example.sunny.data.HealthMetric
+import com.example.sunny.data.HealthTemplates
 import com.example.sunny.ui.theme.MorandiRed
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class,
@@ -256,7 +268,7 @@ fun HealthRecordCard(record: HealthRecord, onClick: () -> Unit) {
                         Text("📍${record.hospitalName}  ", style = MaterialTheme.typography.labelSmall)
                     }
                     if (record.imageUris.isNotEmpty()) {
-                        Text("🖼️ ${record.imageUris.size}张图片", style = MaterialTheme.typography.labelSmall)
+                        Text("🖼️ ${record.imageUris.size}个附件", style = MaterialTheme.typography.labelSmall)
                     }
                 }
             }
@@ -285,6 +297,7 @@ fun HealthFormSheet(
     var diseaseName by remember { mutableStateOf(initial?.diseaseName ?: "常规") }
     var hospitalName by remember { mutableStateOf(initial?.hospitalName ?: "") }
     var imageUris by remember { mutableStateOf(initial?.imageUris ?: emptyList()) }
+    var metrics by remember { mutableStateOf(initial?.metrics ?: emptyList<HealthMetric>()) }
 
     // 1. 修改选择器，支持所有图片和 PDF
     val launcher = rememberLauncherForActivityResult(
@@ -293,9 +306,11 @@ fun HealthFormSheet(
         uris.forEach { uri ->
             // 关键：申请永久保留该文件的访问权限
             try {
-                val takeFlags: Int = Intent.FLAG_GRANT_READ_URI_PERMISSION or
-                        Intent.FLAG_GRANT_WRITE_URI_PERMISSION
-                context.contentResolver.takePersistableUriPermission(uri, takeFlags)
+                // 关键：必须获取永久读取权限，否则后台渲染 PDF 会因为权限不足报错
+                context.contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
             } catch (e: Exception) {
                 e.printStackTrace()
             }
@@ -307,6 +322,8 @@ fun HealthFormSheet(
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .navigationBarsPadding() // 避开底部导航条
+            .imePadding()            // 关键：避开软键盘，防止键盘挡住输入框
             .padding(horizontal = 24.dp)
             .padding(bottom = 32.dp)
             .verticalScroll(rememberScrollState()) // 确保内容多时可滑动
@@ -322,7 +339,7 @@ fun HealthFormSheet(
         OutlinedTextField(
             value = title,
             onValueChange = { title = it },
-            label = { Text("记录名称 (如：XX医院年度体检)") },
+            label = { Text("记录名称 (如：XX医院年度体检)", style = MaterialTheme.typography.bodyMedium, color = Color.LightGray,) },
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(12.dp),
             singleLine = true
@@ -349,6 +366,51 @@ fun HealthFormSheet(
             }
         }
 
+        if (type == "体检") {
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Text("体检指标", style = MaterialTheme.typography.labelSmall, color = MorandiBlue)
+
+            // 如果当前列表为空，显示“添加”大按钮
+            if (metrics.isEmpty()) {
+                OutlinedButton(
+                    onClick = { metrics = HealthTemplates.defaultMetrics }, // 👈 一键导入刚才定义的模板
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Icon(Icons.Default.AddChart, null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("添加常用体检指标")
+                }
+            }
+
+            // 渲染指标录入区域
+            metrics.forEachIndexed { index, metric ->
+                MetricEditRow(
+                    metric = metric,
+                    onUpdate = { updated ->
+                        // 更新列表中对应的项
+                        val newList = metrics.toMutableList()
+                        newList[index] = updated
+                        metrics = newList
+                    },
+                    onDelete = {
+                        val newList = metrics.toMutableList()
+                        newList.removeAt(index)
+                        metrics = newList
+                    }
+                )
+            }
+
+            // 允许在模板之外手动新增自定义行
+            if (metrics.isNotEmpty()) {
+                TextButton(onClick = { metrics = metrics + HealthMetric("", "", "") }) {
+                    Icon(Icons.Default.Add, null, modifier = Modifier.size(16.dp))
+                    Text("新增自定义指标", fontSize = 12.sp)
+                }
+            }
+        }
+
         // 3. 日期选择卡片
         Card(
             onClick = { showDatePicker(context, date) { date = it } },
@@ -366,21 +428,21 @@ fun HealthFormSheet(
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(8.dp))
 
         // 4. 医生与费用 (并排展示)
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             OutlinedTextField(
                 value = doctor,
                 onValueChange = { doctor = it },
-                label = { Text("主治医生") },
+                label = { Text("主治医生", style = MaterialTheme.typography.bodyMedium, color = Color.LightGray,) },
                 modifier = Modifier.weight(1f),
                 shape = RoundedCornerShape(12.dp)
             )
             OutlinedTextField(
                 value = cost,
                 onValueChange = { cost = it },
-                label = { Text("花费(元)") },
+                label = { Text("花费(元)", style = MaterialTheme.typography.bodyMedium, color = Color.LightGray,) },
                 modifier = Modifier.weight(0.8f),
                 shape = RoundedCornerShape(12.dp),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
@@ -394,13 +456,13 @@ fun HealthFormSheet(
             OutlinedTextField(
                 value = diseaseName,
                 onValueChange = { diseaseName = it },
-                label = { Text("疾病所属分组 (如:胃病)") },
+                label = { Text("分组 (如:消化系统)") },
                 modifier = Modifier.weight(1f)
             )
             OutlinedTextField(
                 value = hospitalName,
                 onValueChange = { hospitalName = it },
-                label = { Text("就诊医院") },
+                label = { Text("就诊医院", style = MaterialTheme.typography.bodyMedium, color = Color.LightGray,) },
                 modifier = Modifier.weight(1f)
             )
         }
@@ -465,12 +527,13 @@ fun HealthFormSheet(
             }
 
         }
+        Spacer(modifier = Modifier.height(24.dp))
 
         // 5. 详情记录
         OutlinedTextField(
             value = content,
             onValueChange = { content = it },
-            label = { Text("详情/体检结论/医生嘱托") },
+            label = { Text("详情/体检结论/医生嘱托", style = MaterialTheme.typography.bodyMedium, color = Color.LightGray,) },
             modifier = Modifier.fillMaxWidth(),
             minLines = 3,
             shape = RoundedCornerShape(12.dp)
@@ -494,7 +557,8 @@ fun HealthFormSheet(
                         isDeleted = initial?.isDeleted ?: false,
                         diseaseName = diseaseName,
                         hospitalName = hospitalName,
-                        imageUris = imageUris
+                        imageUris = imageUris,
+                        metrics = metrics
                     ))
                 }
             },
@@ -554,6 +618,17 @@ fun HealthDetailView(record: HealthRecord, onEditClick: () -> Unit) {
                 InfoRow("主治医生", record.doctorName.ifEmpty { "未记录" })
                 InfoRow("产生费用", if(record.cost.isEmpty()) "¥ 0" else "¥ ${record.cost}")
             }
+        }
+
+        if (record.metrics.any { it.value.isNotEmpty() }) {
+            Text(
+                "检查项目明细",
+                modifier = Modifier.padding(top = 24.dp, bottom = 8.dp),
+                style = MaterialTheme.typography.titleSmall,
+                color = MorandiBlue
+            )
+            // 调用我们下面定义的表格组件
+            HealthReportTable(record.metrics)
         }
 
         // --- 详细描述 ---
@@ -647,44 +722,64 @@ fun FileDetailItem(uriString: String) {
             context.contentResolver.getType(Uri.parse(uriString)) == "application/pdf"
 
     if (isPdf) {
-        // --- PDF 的显示方式：做一个精致的文件卡片 ---
-        Card(
-            onClick = {
-                // 点击逻辑：调用系统应用打开 PDF
-                try {
-                    val uri = Uri.parse(uriString)
-                    val intent = Intent(Intent.ACTION_VIEW).apply {
-                        setDataAndType(uri, "application/pdf")
-                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION) // 授权读取
-                    }
-                    context.startActivity(Intent.createChooser(intent, "打开 PDF 报告"))
-                } catch (e: Exception) {
-                    // 如果手机没安装任何 PDF 阅读器
-                    android.widget.Toast.makeText(context, "未找到 PDF 阅读器", android.widget.Toast.LENGTH_SHORT).show()
-                }
-            },
+        // --- 核心优化：PDF 内嵌展示 ---
+        var pdfBitmaps by remember { mutableStateOf<List<android.graphics.Bitmap>>(emptyList()) }
+
+        // 在后台线程渲染 PDF
+        LaunchedEffect(uriString) {
+            withContext(Dispatchers.IO) {
+                pdfBitmaps = com.example.sunny.util.PdfUtil.renderPdfToBitmaps(context, uriString)
+            }
+        }
+
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(72.dp), // PDF 显示为横向的长条卡片
-            colors = CardDefaults.cardColors(containerColor = MorandiRed.copy(alpha = 0.05f)),
-            border = BorderStroke(1.dp, MorandiRed.copy(alpha = 0.1f)),
-            shape = RoundedCornerShape(12.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(MorandiRed.copy(alpha = 0.05f))
+                .padding(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Row(
-                modifier = Modifier.fillMaxSize().padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // PDF 专属图标
-                Icon(
-                    imageVector = Icons.Default.PictureAsPdf,
-                    contentDescription = "PDF",
-                    tint = MorandiRed,
-                    modifier = Modifier.size(32.dp)
-                )
-                Spacer(Modifier.width(16.dp))
-                Column {
-                    Text("医疗报告.pdf", style = MaterialTheme.typography.bodyMedium, color = MorandiDark)
-                    Text("点击使用系统阅读器查看详情", style = MaterialTheme.typography.labelSmall, color = MorandiDark.copy(alpha = 0.5f))
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(8.dp)) {
+                Icon(Icons.Default.PictureAsPdf, null, tint = MorandiRed, modifier = Modifier.size(20.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("PDF 报告预览", style = MaterialTheme.typography.labelSmall, color = MorandiRed)
+            }
+
+            if (pdfBitmaps.isEmpty()) {
+                // 加载中状态
+                Box(Modifier.fillMaxWidth().height(100.dp), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = MorandiRed.copy(alpha = 0.3f), strokeWidth = 2.dp)
+                }
+            } else {
+                // 像照片墙一样垂直展示 PDF 的每一页
+                pdfBitmaps.forEach { bitmap ->
+                    Card(
+                        modifier = Modifier.fillMaxWidth().wrapContentHeight(),
+                        shape = RoundedCornerShape(4.dp),
+                        elevation = CardDefaults.cardElevation(2.dp)
+                    ) {
+                        androidx.compose.foundation.Image(
+                            bitmap = bitmap.asImageBitmap(),
+                            contentDescription = "PDF Page",
+                            modifier = Modifier.fillMaxWidth(),
+                            contentScale = ContentScale.FillWidth
+                        )
+                    }
+                }
+
+                // 底部提供一个按钮，可以调用系统查看器（用于缩放和打印）
+                TextButton(
+                    onClick = {
+                        val intent = Intent(Intent.ACTION_VIEW).apply {
+                            setDataAndType(Uri.parse(uriString), "application/pdf")
+                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        }
+                        context.startActivity(Intent.createChooser(intent, "查看完整文档"))
+                    },
+                    modifier = Modifier.align(Alignment.CenterHorizontally)
+                ) {
+                    Text("查看/打印完整原件", fontSize = 12.sp, color = MorandiBlue)
                 }
             }
         }
@@ -708,4 +803,253 @@ fun FileDetailItem(uriString: String) {
     }
 }
 
+@Composable
+fun HealthReportTable(metrics: List<HealthMetric>) {
+    val displayList = metrics.filter { it.value.isNotEmpty() }
+    if (displayList.isEmpty()) return
 
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 12.dp),
+        color = White,
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(0.5.dp, MorandiBlue.copy(alpha = 0.1f)),
+        shadowElevation = 0.5.dp
+    ) {
+        Column(modifier = Modifier.padding(vertical = 8.dp)) {
+            displayList.forEachIndexed { index, metric ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.Top // 顶部对齐，方便多行展示参考值
+                ) {
+                    // 1. 左侧：指标名称（占据一半空间）
+                    Text(
+                        text = metric.label,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MorandiDark.copy(alpha = 0.7f),
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    // 2. 右侧：数值信息块（占据另一半空间，且内容靠右）
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        horizontalAlignment = Alignment.End // 关键：让数字和下方信息全部右对齐
+                    ) {
+                        // 数值
+                        Text(
+                            text = metric.value,
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontWeight = FontWeight.SemiBold,
+                                color = if (metric.isAbnormal()) MorandiRed else MorandiDark,
+                                textAlign = TextAlign.End // 文字在内部也右对齐
+                            )
+                        )
+
+                        // 单位 + 参考值（放在数字下方，不再干扰数字对齐）
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            if (metric.unit.isNotEmpty()) {
+                                Text(
+                                    text = "(${metric.unit})",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = Color.Gray.copy(alpha = 0.6f)
+                                )
+                                if (metric.getRefText().isNotEmpty()) {
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Box(modifier = Modifier.size(2.dp).background(Color.LightGray, CircleShape))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                }
+                            }
+
+                            if (metric.getRefText().isNotEmpty()) {
+                                Text(
+                                    text = metric.getRefText().replace("参考值: ", ""), // 简化文案，更精致
+                                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                                    color = Color.LightGray
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // 极细分割线
+                if (index < displayList.size - 1) {
+                    HorizontalDivider(
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                        thickness = 0.5.dp,
+                        color = MorandiBlue.copy(alpha = 0.05f)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun MetricRow(metric: HealthMetric) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // 左侧：指标名称
+        Text(
+            text = metric.label,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MorandiDark.copy(alpha = 0.8f)
+        )
+
+        // 右侧：数值和单位
+        Column(horizontalAlignment = Alignment.End) {
+            Text(
+                text = metric.value,
+                style = MaterialTheme.typography.titleMedium,
+                // 如果异常显示红色，否则显示深色
+                color = if (metric.isAbnormal()) MorandiRed else MorandiDark,
+                fontWeight = FontWeight.Bold
+            )
+            if (metric.unit.isNotEmpty()) {
+                Text(
+                    text = metric.unit,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color.Gray
+                )
+            }
+        }
+    }
+}
+
+// 抽取出来的指标输入行组件，防止代码混乱
+@Composable
+fun MetricInputRow(
+    metric: HealthMetric,
+    onUpdate: (HealthMetric) -> Unit,
+    onDelete: () -> Unit
+) {
+    Row(
+        modifier = Modifier.padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // 项目名称
+        BasicTextField(
+            value = metric.label,
+            onValueChange = { onUpdate(metric.copy(label = it)) },
+            modifier = Modifier.weight(1f).padding(8.dp),
+            textStyle = MaterialTheme.typography.bodyMedium.copy(color = MorandiDark),
+            decorationBox = { inner ->
+                if (metric.label.isEmpty()) Text("项目 (如:体重)", color = Color.LightGray, style = MaterialTheme.typography.bodyMedium)
+                inner()
+            }
+        )
+
+        // 垂直分割线
+        Box(modifier = Modifier.width(1.dp).height(20.dp).background(Color.LightGray.copy(alpha = 0.3f)))
+
+        // 结果数值
+        BasicTextField(
+            value = metric.value,
+            onValueChange = { onUpdate(metric.copy(value = it)) },
+            modifier = Modifier.weight(0.8f).padding(8.dp),
+            textStyle = MaterialTheme.typography.bodyMedium.copy(color = MorandiDark, fontWeight = FontWeight.Bold),
+            decorationBox = { inner ->
+                if (metric.value.isEmpty()) Text("结果", color = Color.LightGray, style = MaterialTheme.typography.bodyMedium)
+                inner()
+            }
+        )
+
+        Box(
+            modifier = Modifier.size(24.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            if (metric.value.isNotEmpty()) { // 只有填了值才显示图标
+                Icon(
+                    imageVector = if (metric.isAbnormal()) Icons.Default.Error else Icons.Default.CheckCircle,
+                    contentDescription = null,
+                    tint = if (metric.isAbnormal()) MorandiRed else MorandiGreen.copy(alpha = 0.6f),
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+        }
+
+        // 删除按钮
+        IconButton(onClick = onDelete) {
+            Icon(Icons.Default.Close, null, tint = Color.Gray.copy(alpha = 0.5f), modifier = Modifier.size(18.dp))
+        }
+    }
+}
+
+@Composable
+fun MetricEditRow(
+    metric: HealthMetric,
+    onUpdate: (HealthMetric) -> Unit,
+    onDelete: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        // 1. 项目名称 (如果是预设的，看起来像个标签；如果是自定义的，可以编辑)
+        Box(modifier = Modifier.weight(1f)) {
+            OutlinedTextField(
+                value = metric.label,
+                onValueChange = { onUpdate(metric.copy(label = it)) },
+                label = { Text("项目", fontSize = 10.sp) },
+                modifier = Modifier.fillMaxWidth(),
+                textStyle = MaterialTheme.typography.bodyMedium,
+                shape = RoundedCornerShape(8.dp),
+                singleLine = true,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = MorandiBlue,
+                    unfocusedBorderColor = MorandiBlue.copy(alpha = 0.2f)
+                )
+            )
+        }
+
+        // 2. 数值输入框 (重点：输入时实时判断是否异常)
+        Box(modifier = Modifier.weight(0.8f)) {
+            OutlinedTextField(
+                value = metric.value,
+                onValueChange = { onUpdate(metric.copy(value = it)) },
+                label = {
+                    Text(
+                        text = if (metric.unit.isNotEmpty()) "数值(${metric.unit})" else "数值",
+                        fontSize = 10.sp
+                    )
+                },
+                modifier = Modifier.fillMaxWidth(),
+                textStyle = MaterialTheme.typography.bodyMedium.copy(
+                    // 【高级感】：输入如果异常，文字颜色即刻变红
+                    color = if (metric.isAbnormal()) MorandiRed else MorandiDark,
+                    fontWeight = FontWeight.Bold
+                ),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                shape = RoundedCornerShape(8.dp),
+                singleLine = true,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = if (metric.isAbnormal()) MorandiRed else MorandiGreen,
+                    unfocusedBorderColor = if (metric.isAbnormal()) MorandiRed.copy(alpha = 0.5f) else MorandiBlue.copy(alpha = 0.2f)
+                )
+            )
+        }
+
+        // 3. 删除小按钮
+        IconButton(
+            onClick = onDelete,
+            modifier = Modifier.size(24.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.RemoveCircleOutline,
+                contentDescription = "删除",
+                tint = MorandiRed.copy(alpha = 0.6f),
+                modifier = Modifier.size(18.dp)
+            )
+        }
+    }
+}
