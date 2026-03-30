@@ -67,4 +67,7 @@ dependencies {
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
+
+    // ML Kit 文字识别 (中文/英文)
+    implementation("com.google.mlkit:text-recognition-chinese:16.0.0")
 }

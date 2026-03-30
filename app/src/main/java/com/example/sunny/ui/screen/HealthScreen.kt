@@ -2,6 +2,7 @@ package com.example.sunny.ui.screen
 
 import android.content.Intent
 import android.net.Uri
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -44,6 +45,7 @@ import androidx.compose.material.icons.filled.AddAPhoto
 import androidx.compose.material.icons.filled.AddChart
 import androidx.compose.material.icons.filled.Assignment
 import androidx.compose.material.icons.filled.AttachFile
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
@@ -298,6 +300,7 @@ fun HealthFormSheet(
     var hospitalName by remember { mutableStateOf(initial?.hospitalName ?: "") }
     var imageUris by remember { mutableStateOf(initial?.imageUris ?: emptyList()) }
     var metrics by remember { mutableStateOf(initial?.metrics ?: emptyList<HealthMetric>()) }
+    var isScanning by remember { mutableStateOf(false) }
 
     // 1. 修改选择器，支持所有图片和 PDF
     val launcher = rememberLauncherForActivityResult(
@@ -363,51 +366,6 @@ fun HealthFormSheet(
                         selectedLabelColor = Color.White
                     )
                 )
-            }
-        }
-
-        if (type == "体检") {
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Text("体检指标", style = MaterialTheme.typography.labelSmall, color = MorandiBlue)
-
-            // 如果当前列表为空，显示“添加”大按钮
-            if (metrics.isEmpty()) {
-                OutlinedButton(
-                    onClick = { metrics = HealthTemplates.defaultMetrics }, // 👈 一键导入刚才定义的模板
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Icon(Icons.Default.AddChart, null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text("添加常用体检指标")
-                }
-            }
-
-            // 渲染指标录入区域
-            metrics.forEachIndexed { index, metric ->
-                MetricEditRow(
-                    metric = metric,
-                    onUpdate = { updated ->
-                        // 更新列表中对应的项
-                        val newList = metrics.toMutableList()
-                        newList[index] = updated
-                        metrics = newList
-                    },
-                    onDelete = {
-                        val newList = metrics.toMutableList()
-                        newList.removeAt(index)
-                        metrics = newList
-                    }
-                )
-            }
-
-            // 允许在模板之外手动新增自定义行
-            if (metrics.isNotEmpty()) {
-                TextButton(onClick = { metrics = metrics + HealthMetric("", "", "") }) {
-                    Icon(Icons.Default.Add, null, modifier = Modifier.size(16.dp))
-                    Text("新增自定义指标", fontSize = 12.sp)
-                }
             }
         }
 
@@ -477,13 +435,14 @@ fun HealthFormSheet(
         ) {
             // 修改原本的 IconButton 或者是上传按钮的 onClick
             Button(
-                onClick = {
-                    launcher.launch(arrayOf("image/*", "application/pdf"))
-                },
-                // 样式代码...
+                onClick = { launcher.launch(arrayOf("image/*", "application/pdf")) },
+                modifier = Modifier.fillMaxWidth().height(48.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = MorandiBlue.copy(alpha = 0.8f))
             ) {
-                Icon(Icons.Default.AttachFile, null)
-                Text("添加照片或PDF报告")
+                Icon(Icons.Default.AttachFile, null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("添加照片或PDF报告", style = MaterialTheme.typography.labelMedium)
             }
 
             // 显示已选图片（建议使用 Coil 库显示预览图）
@@ -528,6 +487,99 @@ fun HealthFormSheet(
 
         }
         Spacer(modifier = Modifier.height(24.dp))
+
+        if (type == "体检") {
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Text("体检指标", style = MaterialTheme.typography.labelSmall, color = MorandiBlue)
+
+            // 如果当前列表为空，显示“添加”大按钮
+            if (metrics.isEmpty()) {
+                OutlinedButton(
+                    onClick = { metrics = HealthTemplates.defaultMetrics }, // 👈 一键导入刚才定义的模板
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Icon(Icons.Default.AddChart, null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("添加常用体检指标")
+                }
+            }
+            if (imageUris.isNotEmpty()) {
+//                Spacer(modifier = Modifier.height(2.dp))
+                Button(
+                    onClick = {
+                        isScanning = true
+                        // 尝试识别第一张图
+                        val uri = Uri.parse(imageUris.first())
+                        com.example.sunny.util.MetricScanner.scanImage(context, uri) { results ->
+                            if (results.isEmpty()) {
+                                Toast.makeText(context, "未能识别到有效指标，请确保字迹清晰", Toast.LENGTH_LONG).show()
+                            } else {
+                                // 1. 确定底表（如果没有点击过模板，就用默认模板当底）
+                                val baseList = if (metrics.isEmpty()) HealthTemplates.defaultMetrics else metrics
+
+                                // 2. 填充数据
+                                val updatedList = baseList.map { item ->
+                                    if (results.containsKey(item.label)) {
+                                        // 如果识别到了，用识别的值
+                                        item.copy(value = results[item.label] ?: "")
+                                    } else {
+                                        item
+                                    }
+                                }
+
+                                // 3. 强制更新 Compose 状态
+                                metrics = updatedList
+
+                                isScanning = false
+                                Toast.makeText(context, "成功识别 ${results.size} 个项目", Toast.LENGTH_SHORT).show()
+                            }
+                            isScanning = false // 确保无论如何都停止加载圈
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = MorandiBlue),
+                    enabled = !isScanning,
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    if (isScanning) {
+                        CircularProgressIndicator(modifier = Modifier.size(20.dp), color = White, strokeWidth = 2.dp)
+                    } else {
+                        Icon(Icons.Default.AutoAwesome, null)
+                        Spacer(Modifier.width(4.dp))
+                        Text("识别首张附件并填表")
+                    }
+                }
+            }
+
+            // 渲染指标录入区域
+            metrics.forEachIndexed { index, metric ->
+                MetricEditRow(
+                    metric = metric,
+                    onUpdate = { updated ->
+                        // 更新列表中对应的项
+                        val newList = metrics.toMutableList()
+                        newList[index] = updated
+                        metrics = newList
+                    },
+                    onDelete = {
+                        val newList = metrics.toMutableList()
+                        newList.removeAt(index)
+                        metrics = newList
+                    }
+                )
+            }
+
+            // 允许在模板之外手动新增自定义行
+            if (metrics.isNotEmpty()) {
+                TextButton(onClick = { metrics = metrics + HealthMetric("", "", "") }) {
+                    Icon(Icons.Default.Add, null, modifier = Modifier.size(16.dp))
+                    Text("新增自定义指标", fontSize = 12.sp)
+                }
+            }
+        }
+
 
         // 5. 详情记录
         OutlinedTextField(
