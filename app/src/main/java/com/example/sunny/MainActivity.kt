@@ -52,10 +52,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.List
 import androidx.compose.animation.Crossfade
+import androidx.compose.material.icons.filled.HealthAndSafety
 import com.example.sunny.ui.theme.FoodBg
 import com.example.sunny.ui.theme.ExpiredBg
 import com.example.sunny.ui.screen.MainListScreen
 import com.example.sunny.ui.screen.TrashScreen
+import com.example.sunny.ui.screen.HealthScreen
 
 class MainActivity : ComponentActivity() {
     @OptIn(ExperimentalMaterial3Api::class)
@@ -77,6 +79,8 @@ class MainActivity : ComponentActivity() {
                 val activeItems by itemDao.getActiveItems(System.currentTimeMillis()).collectAsState(initial = emptyList())
                 // 获取已标记删除的物品（回收站）
                 val deletedItems by itemDao.getDeletedItems().collectAsState(initial = emptyList())
+                val healthRecords by itemDao.getAllHealthRecords().collectAsState(initial = emptyList())
+                val deletedHealth by itemDao.getDeletedHealthRecords().collectAsState(initial = emptyList()) // 确保 DAO 有这个方法
 
                 // --- 弹窗与编辑状态 ---
                 var showSheet by remember { mutableStateOf(false) }
@@ -92,7 +96,7 @@ class MainActivity : ComponentActivity() {
                                 selected = currentTab == 0,
                                 onClick = { currentTab = 0 },
                                 icon = { Icon(Icons.Default.List, contentDescription = "清单") },
-                                label = { Text("我的清单") },
+                                label = { Text("清单") },
                                 colors = NavigationBarItemDefaults.colors(
                                     selectedIconColor = MorandiGreen,
                                     indicatorColor = FoodBg
@@ -101,6 +105,13 @@ class MainActivity : ComponentActivity() {
                             NavigationBarItem(
                                 selected = currentTab == 1,
                                 onClick = { currentTab = 1 },
+                                icon = { Icon(Icons.Filled.HealthAndSafety, "健康") }, // 需导入相应图标
+                                label = { Text("健康") },
+                                colors = NavigationBarItemDefaults.colors(selectedIconColor = MorandiBlue)
+                            )
+                            NavigationBarItem(
+                                selected = currentTab == 2,
+                                onClick = { currentTab = 2 },
                                 icon = { Icon(Icons.Default.Delete, contentDescription = "回收站") },
                                 label = { Text("回收站") },
                                 colors = NavigationBarItemDefaults.colors(
@@ -139,11 +150,8 @@ class MainActivity : ComponentActivity() {
                                     showSheet = true    // 打开编辑弹窗
                                 }
                             )
-                            1 -> TrashScreen(
-                                items = deletedItems,
-                                itemDao = itemDao,
-                                scope = scope
-                            )
+                            1 -> HealthScreen(healthRecords, itemDao, scope) // 健康页面
+                            2 -> TrashScreen(deletedItems, deletedHealth, itemDao, scope)
                         }
                     }
 
